@@ -24,13 +24,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
-        // Build participants HTML
-        const participantsHtml =
-          details.participants && details.participants.length
-            ? `<div class="participants"><strong>Participants:</strong><ul class="participants-list">${details.participants
-                .map((p) => `<li>${p}</li>`)
-                .join("")}</ul></div>`
-            : `<div class="participants participants-empty"><em>No participants yet</em></div>`;
+          // Build participants HTML (hide bullets and add remove button per participant)
+          const participantsHtml =
+            details.participants && details.participants.length
+              ? `<div class="participants"><strong>Participants:</strong><ul class="participants-list">${details.participants
+                  .map(
+                    (p) =>
+                      `<li class="participant-item"><span class="participant-email">${p}</span><button class="remove-participant" data-activity="${encodeURIComponent(
+                        name
+                      )}" data-email="${encodeURIComponent(p)}" aria-label="Remove participant">×</button></li>`
+                  )
+                  .join("")}</ul></div>`
+              : `<div class="participants participants-empty"><em>No participants yet</em></div>`;
 
         activityCard.innerHTML = `
           <h4>${name}</h4>
@@ -93,6 +98,50 @@ document.addEventListener("DOMContentLoaded", () => {
       messageDiv.className = "error";
       messageDiv.classList.remove("hidden");
       console.error("Error signing up:", error);
+    }
+  });
+
+  // Event delegation for remove participant buttons
+  activitiesList.addEventListener("click", async (event) => {
+    const btn = event.target.closest(".remove-participant");
+    if (!btn) return;
+
+    const activityEncoded = btn.getAttribute("data-activity");
+    const emailEncoded = btn.getAttribute("data-email");
+    if (!activityEncoded || !emailEncoded) return;
+
+    const activityName = decodeURIComponent(activityEncoded);
+    const email = decodeURIComponent(emailEncoded);
+
+    // Confirm removal
+    if (!confirm(`Unregister ${email} from ${activityName}?`)) return;
+
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activityName)}/signup?email=${encodeURIComponent(email)}`,
+        { method: "DELETE" }
+      );
+
+      const result = await response.json();
+      if (response.ok) {
+        messageDiv.textContent = result.message;
+        messageDiv.className = "success";
+        messageDiv.classList.remove("hidden");
+        // Refresh the list
+        fetchActivities();
+      } else {
+        messageDiv.textContent = result.detail || "Failed to remove participant";
+        messageDiv.className = "error";
+        messageDiv.classList.remove("hidden");
+      }
+
+      setTimeout(() => messageDiv.classList.add("hidden"), 4000);
+    } catch (err) {
+      console.error("Error removing participant:", err);
+      messageDiv.textContent = "Failed to remove participant. Try again.";
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      setTimeout(() => messageDiv.classList.add("hidden"), 4000);
     }
   });
 
